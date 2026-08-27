@@ -1,0 +1,24 @@
+// Vercel serverless function: POST /api/summarize
+// Body: { transcript }. Returns { summary, recommended_questions }.
+import { summarize } from '../lib/gemini.js';
+
+export const config = { maxDuration: 60 };
+
+async function readJson(req) {
+  if (req.body && typeof req.body === 'object') return req.body;
+  const chunks = [];
+  for await (const chunk of req) chunks.push(chunk);
+  const raw = Buffer.concat(chunks).toString('utf8');
+  try { return JSON.parse(raw || '{}'); } catch { return {}; }
+}
+
+export default async function handler(req, res) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+  try {
+    const body = await readJson(req);
+    res.json(await summarize(body.transcript));
+  } catch (err) {
+    console.error('summarize error:', err);
+    res.status(500).json({ error: err?.message || 'Summary failed.' });
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "slug",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Consultation scribe: transcribes a doctor–patient conversation, then drafts a summary and follow-up questions for the doctor to verify.",
+  "type": "module",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@google/genai": "latest"
+  },
+  "devDependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2"
+  }
+}

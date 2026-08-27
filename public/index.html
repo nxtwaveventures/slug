@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+  <title>slug — consultation scribe</title>
+  <style>
+    :root { --bg:#0f1720; --card:#172230; --ink:#e8eef5; --muted:#93a2b4; --line:#26374a;
+            --accent:#3ba776; --accent2:#2f6dd0; --warn:#e0a53b; --danger:#c0503f; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+           background:var(--bg); color:var(--ink); line-height:1.5; }
+    header { padding:18px 20px; border-bottom:1px solid var(--line); }
+    h1 { margin:0; font-size:20px; letter-spacing:.02em; }
+    header p { margin:4px 0 0; color:var(--muted); font-size:13px; }
+    main { max-width:720px; margin:0 auto; padding:20px; }
+    .card { background:var(--card); border:1px solid var(--line); border-radius:14px;
+            padding:18px; margin-bottom:16px; }
+    label { display:block; font-size:13px; color:var(--muted); margin-bottom:6px; }
+    select { width:100%; padding:12px; font-size:16px; border-radius:10px;
+             border:1px solid var(--line); background:#0e1620; color:var(--ink); }
+    .consent { font-size:14px; color:var(--warn); background:rgba(224,165,59,.08);
+               border:1px solid rgba(224,165,59,.3); border-radius:10px; padding:12px; }
+    .controls { display:flex; gap:12px; }
+    button { flex:1; padding:18px; font-size:17px; font-weight:600; border:none;
+             border-radius:12px; color:#fff; cursor:pointer; }
+    #rec { background:var(--accent); }
+    #stop { background:var(--danger); }
+    button:disabled { opacity:.4; cursor:not-allowed; }
+    #status { text-align:center; color:var(--muted); font-size:14px; min-height:20px; margin-top:10px; }
+    .pulse { color:var(--danger); font-weight:600; }
+    h2 { font-size:14px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 10px; }
+    .draft-tag { display:inline-block; font-size:11px; font-weight:700; color:#111; background:var(--warn);
+                 padding:2px 8px; border-radius:20px; margin-left:8px; vertical-align:middle; }
+    textarea { width:100%; background:#0e1620; color:var(--ink); border:1px solid var(--line);
+               border-radius:10px; padding:10px; font-size:15px; resize:vertical; }
+    .field { margin-bottom:12px; }
+    ul { margin:0; padding-left:20px; } li { margin-bottom:8px; }
+    .hidden { display:none; }
+    .transcript { white-space:pre-wrap; font-size:14px; color:var(--muted); max-height:220px; overflow:auto; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>slug</h1>
+    <p>Records the consultation, transcribes it, and drafts notes for the doctor to verify. It does not diagnose.</p>
+  </header>
+  <main>
+    <div class="card">
+      <div class="field">
+        <label for="lang">Patient language</label>
+        <select id="lang">
+          <option value="hi-IN">Hindi</option>
+          <option value="te-IN">Telugu</option>
+          <option value="ta-IN">Tamil</option>
+          <option value="bn-IN">Bengali</option>
+          <option value="mr-IN">Marathi</option>
+          <option value="gu-IN">Gujarati</option>
+          <option value="kn-IN">Kannada</option>
+          <option value="or-IN">Odia</option>
+          <option value="en-IN">English (India)</option>
+        </select>
+      </div>
+      <p class="consent">Before recording, tell the patient in their language that the
+        conversation will be recorded to help the doctor, and get their agreement.</p>
+      <div class="controls" style="margin-top:14px;">
+        <button id="rec">● Start</button>
+        <button id="stop" disabled>■ Stop</button>
+      </div>
+      <div id="status">Ready.</div>
+    </div>
+
+    <div id="results" class="hidden">
+      <div class="card">
+        <h2>Summary <span class="draft-tag">AI DRAFT — VERIFY</span></h2>
+        <div class="field"><label>Chief complaint</label><textarea id="chief" rows="2"></textarea></div>
+        <div class="field"><label>History</label><textarea id="history" rows="3"></textarea></div>
+        <div class="field"><label>Symptoms</label><textarea id="symptoms" rows="2"></textarea></div>
+        <div class="field"><label>Medications mentioned</label><textarea id="meds" rows="2"></textarea></div>
+        <div class="field"><label>Notes</label><textarea id="notes" rows="2"></textarea></div>
+      </div>
+      <div class="card">
+        <h2>Recommended follow-up questions <span class="draft-tag">AI DRAFT</span></h2>
+        <ul id="questions"></ul>
+      </div>
+      <div class="card">
+        <h2>Full transcript</h2>
+        <div id="transcript" class="transcript"></div>
+      </div>
+    </div>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
