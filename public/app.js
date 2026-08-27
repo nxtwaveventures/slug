@@ -38,10 +38,11 @@ async function submitCode() {
   } catch { $('gateErr').textContent = 'Network error — try again.'; }
 }
 
-// On load: if we already have a valid code this session, skip the gate.
+// On load: reveal the app if allowed. If the gate is disabled server-side
+// (public — no ACCESS_CODE), /api/check returns ok, so we skip the gate entirely.
+// If the gate is enabled, this stays locked until a valid code is entered.
 (async () => {
-  const code = getCode();
-  if (code && (await tryUnlock(code).catch(() => false))) showApp();
+  if (await tryUnlock(getCode()).catch(() => false)) showApp();
 })();
 // -------------------------------------------------------------------------
 
