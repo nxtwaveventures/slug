@@ -6,6 +6,45 @@ const $ = (id) => document.getElementById(id);
 let audioCtx, source, processor, stream, chunks = [], sampleRate = 16000;
 let timerId = null;
 
+// --- Access gate ---------------------------------------------------------
+const getCode = () => { try { return sessionStorage.getItem('slug_access') || ''; } catch { return ''; } };
+const setCode = (c) => { try { sessionStorage.setItem('slug_access', c); } catch {} };
+const clearCode = () => { try { sessionStorage.removeItem('slug_access'); } catch {} };
+const authHeaders = (extra = {}) => ({ 'x-access-code': getCode(), ...extra });
+
+function showApp() { $('gate').style.display = 'none'; $('app').classList.remove('hidden'); }
+function lock(msg) {
+  clearCode();
+  $('app').classList.add('hidden');
+  $('gate').style.display = 'flex';
+  if (msg) $('gateErr').textContent = msg;
+}
+
+async function tryUnlock(code) {
+  const r = await fetch('/api/check', { method: 'POST', headers: { 'x-access-code': code } });
+  return r.ok;
+}
+
+$('enter').onclick = submitCode;
+$('code').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitCode(); });
+
+async function submitCode() {
+  const code = $('code').value.trim();
+  if (!code) return;
+  $('gateErr').textContent = 'Checking…';
+  try {
+    if (await tryUnlock(code)) { setCode(code); $('gateErr').textContent = ''; showApp(); }
+    else $('gateErr').textContent = 'Wrong access code.';
+  } catch { $('gateErr').textContent = 'Network error — try again.'; }
+}
+
+// On load: if we already have a valid code this session, skip the gate.
+(async () => {
+  const code = getCode();
+  if (code && (await tryUnlock(code).catch(() => false))) showApp();
+})();
+// -------------------------------------------------------------------------
+
 $('rec').onclick = start;
 $('stop').onclick = stop;
 
@@ -43,8 +82,9 @@ async function stop() {
   let transcript = '';
   try {
     const r = await fetch(`/api/transcribe?langs=${encodeURIComponent(lang)}`, {
-      method: 'POST', headers: { 'Content-Type': 'audio/wav' }, body: wav,
+      method: 'POST', headers: authHeaders({ 'Content-Type': 'audio/wav' }), body: wav,
     });
+    if (r.status === 401) { stopTimer(); return lock('Session expired — enter the access code again.'); }
     const data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Transcription error');
     transcript = data.transcript || '';
@@ -57,9 +97,10 @@ async function stop() {
   startTimer('Drafting summary');
   try {
     const r = await fetch('/api/summarize', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ transcript }),
     });
+    if (r.status === 401) { stopTimer(); return lock('Session expired — enter the access code again.'); }
     const draft = await r.json();
     if (!r.ok) throw new Error(draft.error || 'Summary error');
     showSummary(draft);

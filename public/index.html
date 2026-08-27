@@ -38,9 +38,31 @@
     ul { margin:0; padding-left:20px; } li { margin-bottom:8px; }
     .hidden { display:none; }
     .transcript { white-space:pre-wrap; font-size:14px; color:var(--muted); max-height:220px; overflow:auto; }
+    /* access gate */
+    #gate { position:fixed; inset:0; background:var(--bg); display:flex; align-items:center;
+            justify-content:center; padding:20px; z-index:10; }
+    #gate .card { width:100%; max-width:380px; text-align:center; }
+    #gate h1 { margin:0 0 4px; }
+    #gate p { color:var(--muted); font-size:13px; margin:0 0 16px; }
+    #gate input { width:100%; padding:14px; font-size:16px; border-radius:10px; text-align:center;
+                  letter-spacing:.1em; border:1px solid var(--line); background:#0e1620; color:var(--ink); margin-bottom:12px; }
+    #gate button { width:100%; padding:14px; font-size:16px; font-weight:600; border:none;
+                   border-radius:10px; background:var(--accent2); color:#fff; cursor:pointer; }
+    #gateErr { color:var(--danger); font-size:13px; min-height:18px; margin-top:10px; }
+    #app.hidden { display:none; }
   </style>
 </head>
 <body>
+  <div id="gate">
+    <div class="card">
+      <h1>slug</h1>
+      <p>Enter the access code to continue.</p>
+      <input id="code" type="password" inputmode="text" autocomplete="off" placeholder="Access code" />
+      <button id="enter">Enter</button>
+      <div id="gateErr"></div>
+    </div>
+  </div>
+  <div id="app" class="hidden">
   <header>
     <h1>slug</h1>
     <p>Records the consultation, transcribes it, and drafts notes for the doctor to verify. It does not diagnose.</p>
@@ -89,6 +111,7 @@
       </div>
     </div>
   </main>
+  </div>
   <script src="app.js"></script>
 </body>
 </html>

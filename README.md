@@ -45,3 +45,18 @@ Transcription accuracy on low-resource tribal dialects is the biggest unknown.
 Record a few real mock consultations and check the transcript quality before
 building anything further. Major Indian languages are well supported; specific
 tribal dialects may not be.
+
+## Access gate
+
+The public URL is protected by a shared access code so the API (and your Gemini
+quota) isn't open to anyone with the link.
+
+- Set `ACCESS_CODE` (env var) locally and on Vercel to any value you like.
+- Testers open the site, enter the code once (stored for the browser session),
+  and every API call sends it in the `x-access-code` header; the server rejects
+  requests without it (401).
+- If `ACCESS_CODE` is not set, the gate is disabled (open) — handy for local dev,
+  but always set it in production.
+
+This is a lightweight shared-secret gate, not per-user accounts. For real
+patient use you'd want proper authentication.

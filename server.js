@@ -6,6 +6,7 @@
 import 'dotenv/config';
 import express from 'express';
 import { transcribe, summarize } from './lib/gemini.js';
+import { requestAllowed, gateEnabled } from './lib/access.js';
 
 if (!process.env.GEMINI_API_KEY) {
   console.error('\n  Missing GEMINI_API_KEY. Copy .env.example to .env and add your key.\n');
@@ -16,6 +17,10 @@ const app = express();
 app.use(express.static('public'));
 app.use('/api/transcribe', express.raw({ type: '*/*', limit: '25mb' }));
 app.use('/api/summarize', express.json({ limit: '2mb' }));
+
+// Access gate: every /api route must present a valid x-access-code (when ACCESS_CODE is set).
+app.use('/api', (req, res, next) => (requestAllowed(req) ? next() : res.status(401).json({ error: 'Invalid access code.' })));
+app.post('/api/check', (req, res) => res.json({ ok: true }));
 
 app.post('/api/transcribe', async (req, res) => {
   try {
@@ -44,4 +49,7 @@ app.post('/api/summarize', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`\n  slug running → http://localhost:${PORT}\n`));
+app.listen(PORT, () => {
+  console.log(`\n  slug running → http://localhost:${PORT}`);
+  console.log(`  access gate: ${gateEnabled() ? 'ON (ACCESS_CODE set)' : 'OFF (no ACCESS_CODE — open)'}\n`);
+});
