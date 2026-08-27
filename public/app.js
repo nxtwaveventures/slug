@@ -1,59 +1,41 @@
-// Records mic audio, encodes it to WAV (a format Gemini accepts — MediaRecorder's
-// webm/opus is not guaranteed), then: (1) transcribes and shows it fast, then
-// (2) fetches the summary + questions, which take longer.
+// slug — extra-simple flow: one button, automatic language detection.
+// Tap to start, tap to stop → transcript + doctor draft. No language picker.
 
 const $ = (id) => document.getElementById(id);
 let audioCtx, source, processor, stream, chunks = [], sampleRate = 16000;
-let timerId = null;
+let recording = false, timerId = null;
 
-// --- Access gate ---------------------------------------------------------
+// --- access (only matters if the server has an ACCESS_CODE set) -----------
 const getCode = () => { try { return sessionStorage.getItem('slug_access') || ''; } catch { return ''; } };
 const setCode = (c) => { try { sessionStorage.setItem('slug_access', c); } catch {} };
 const clearCode = () => { try { sessionStorage.removeItem('slug_access'); } catch {} };
 const authHeaders = (extra = {}) => ({ 'x-access-code': getCode(), ...extra });
 
-function showApp() { $('gate').style.display = 'none'; $('app').classList.remove('hidden'); }
 function lock(msg) {
   clearCode();
-  $('app').classList.add('hidden');
-  $('gate').style.display = 'flex';
+  $('gate').classList.add('show');
   if (msg) $('gateErr').textContent = msg;
 }
-
-async function tryUnlock(code) {
-  const r = await fetch('/api/check', { method: 'POST', headers: { 'x-access-code': code } });
-  return r.ok;
-}
-
-$('enter').onclick = submitCode;
-$('code').addEventListener('keydown', (e) => { if (e.key === 'Enter') submitCode(); });
-
-async function submitCode() {
+$('enter').onclick = async () => {
   const code = $('code').value.trim();
   if (!code) return;
   $('gateErr').textContent = 'Checking…';
   try {
-    if (await tryUnlock(code)) { setCode(code); $('gateErr').textContent = ''; showApp(); }
-    else $('gateErr').textContent = 'Wrong access code.';
-  } catch { $('gateErr').textContent = 'Network error — try again.'; }
-}
+    const r = await fetch('/api/check', { method: 'POST', headers: { 'x-access-code': code } });
+    if (r.ok) { setCode(code); $('gate').classList.remove('show'); $('gateErr').textContent = ''; }
+    else $('gateErr').textContent = 'Wrong code.';
+  } catch { $('gateErr').textContent = 'Network error.'; }
+};
+$('code').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('enter').click(); });
 
-// On load: reveal the app if allowed. If the gate is disabled server-side
-// (public — no ACCESS_CODE), /api/check returns ok, so we skip the gate entirely.
-// If the gate is enabled, this stays locked until a valid code is entered.
-(async () => {
-  if (await tryUnlock(getCode()).catch(() => false)) showApp();
-})();
-// -------------------------------------------------------------------------
-
-$('rec').onclick = start;
-$('stop').onclick = stop;
+// --- recording ------------------------------------------------------------
+$('mic').onclick = () => (recording ? stop() : start());
 
 async function start() {
   try {
     stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } });
   } catch {
-    setStatus('Microphone permission is needed to record.');
+    setStatus('Please allow the microphone.');
     return;
   }
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -65,55 +47,54 @@ async function start() {
   source.connect(processor);
   processor.connect(audioCtx.destination);
 
-  $('rec').disabled = true; $('stop').disabled = false;
-  $('status').innerHTML = '<span class="pulse">● Recording…</span>';
+  recording = true;
+  $('mic').classList.add('recording');
+  $('micLabel').textContent = 'Tap to stop';
+  setStatus('Recording…');
 }
 
 async function stop() {
+  recording = false;
   processor.disconnect(); source.disconnect();
   stream.getTracks().forEach((t) => t.stop());
   await audioCtx.close();
-  $('rec').disabled = false; $('stop').disabled = true;
+  $('mic').classList.remove('recording');
+  $('micLabel').textContent = 'Tap to start';
+  $('mic').disabled = true;
 
   const wav = encodeWav(flatten(chunks), sampleRate);
-  const lang = $('lang').value;
 
-  // Phase 1 — transcribe (fast). Show it as soon as it lands.
-  startTimer('Transcribing');
+  // Phase 1 — transcribe (fast). Auto language, so no ?langs.
+  startTimer('Listening');
   let transcript = '';
   try {
-    const r = await fetch(`/api/transcribe?langs=${encodeURIComponent(lang)}`, {
+    const r = await fetch('/api/transcribe', {
       method: 'POST', headers: authHeaders({ 'Content-Type': 'audio/wav' }), body: wav,
     });
-    if (r.status === 401) { stopTimer(); return lock('Session expired — enter the access code again.'); }
+    if (r.status === 401) { stopTimer(); $('mic').disabled = false; return lock('Enter the access code.'); }
     const data = await r.json();
-    if (!r.ok) throw new Error(data.error || 'Transcription error');
+    if (!r.ok) throw new Error(data.error || 'Error');
     transcript = data.transcript || '';
-    showTranscript(data);
+    $('results').classList.remove('hidden');
+    $('transcript').textContent = transcript || '(nothing heard)';
   } catch (err) {
-    stopTimer(); setStatus('Error: ' + err.message); return;
+    stopTimer(); $('mic').disabled = false; return setStatus('Error: ' + err.message);
   }
 
-  // Phase 2 — summary + questions (slower). Fill in when ready.
-  startTimer('Drafting summary');
+  // Phase 2 — summary + questions.
+  startTimer('Writing notes');
   try {
     const r = await fetch('/api/summarize', {
       method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ transcript }),
     });
-    if (r.status === 401) { stopTimer(); return lock('Session expired — enter the access code again.'); }
     const draft = await r.json();
-    if (!r.ok) throw new Error(draft.error || 'Summary error');
-    showSummary(draft);
-    stopTimer(); setStatus('Done. Please review and verify below.');
-  } catch (err) {
-    stopTimer(); setStatus('Transcript ready. Summary failed: ' + err.message);
+    if (r.ok) showSummary(draft);
+    stopTimer(); setStatus('Done — please check and correct below.');
+  } catch {
+    stopTimer(); setStatus('Transcript ready (summary failed).');
   }
-}
-
-function showTranscript(data) {
-  $('results').classList.remove('hidden');
-  $('transcript').textContent = data.transcript || '(no transcript)';
+  $('mic').disabled = false;
 }
 
 function showSummary(data) {
@@ -129,16 +110,13 @@ function showSummary(data) {
   });
 }
 
-// Live elapsed-time status so nothing looks frozen.
 function startTimer(label) {
   const t0 = Date.now();
   const tick = () => setStatus(`${label}… ${((Date.now() - t0) / 1000).toFixed(0)}s`);
-  tick();
-  clearInterval(timerId);
-  timerId = setInterval(tick, 500);
+  tick(); clearInterval(timerId); timerId = setInterval(tick, 500);
 }
 function stopTimer() { clearInterval(timerId); timerId = null; }
-function setStatus(t) { $('status').innerHTML = t; }
+function setStatus(t) { $('status').textContent = t; }
 
 function flatten(arr) {
   const len = arr.reduce((n, a) => n + a.length, 0);
@@ -147,7 +125,7 @@ function flatten(arr) {
   return out;
 }
 
-// 16-bit PCM WAV encoder.
+// 16-bit PCM WAV encoder (a format Gemini accepts).
 function encodeWav(samples, rate) {
   const buffer = new ArrayBuffer(44 + samples.length * 2);
   const view = new DataView(buffer);

@@ -24,7 +24,7 @@ app.post('/api/check', (req, res) => res.json({ ok: true }));
 
 app.post('/api/transcribe', async (req, res) => {
   try {
-    const langs = (req.query.langs || 'hi-IN').split(',').filter(Boolean);
+    const langs = (req.query.langs || '').split(',').filter(Boolean); // empty = auto-detect
     if (!req.body || !req.body.length) return res.status(400).json({ error: 'No audio received.' });
     const t0 = Date.now();
     const out = await transcribe(req.body, langs);
